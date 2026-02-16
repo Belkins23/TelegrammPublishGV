@@ -42,6 +42,9 @@ var app = builder.Build();
 
 app.UseSerilogRequestLogging();
 
+app.UseHttpMetrics();
+app.MapMetrics();
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {

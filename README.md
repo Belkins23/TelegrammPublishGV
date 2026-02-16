@@ -69,6 +69,85 @@ dotnet run
 - **Refused** — отказ от заказа (`orderId`, `userId`, `userName`, `republished`).
 - **Deleted** — публикация удалена по API (`orderId`).
 
+## Мониторинг (Prometheus + Grafana)
+
+Приложение отдаёт метрики в формате Prometheus по адресу **GET http://localhost:5689/metrics**. По ним можно понять, жив ли сервис, и строить графики в Grafana.
+
+### 1. Проверка, что метрики доступны
+
+В браузере или через curl:
+
+```bash
+curl http://localhost:5689/metrics
+```
+
+Должен вернуться текст с метриками (строки вида `# TYPE ...`, `metric_name value`). Если ответ есть — сервис жив и Prometheus сможет его скрапить.
+
+### 2. Настройка Prometheus
+
+Добавь в конфиг Prometheus (`prometheus.yml`) цель для нашего сервиса:
+
+```yaml
+scrape_configs:
+  - job_name: 'telegramm-publish-gv'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:5689']
+```
+
+Если сервис на другом хосте (или в Docker), укажи его адрес вместо `localhost`, например `host.docker.internal:5689` или `192.168.1.10:5689`.
+
+Перезапусти Prometheus и убедись, что в **Status → Targets** цель `telegramm-publish-gv` в состоянии **UP**.
+
+### 3. Grafana: источник данных
+
+1. В Grafana: **Configuration (шестерёнка) → Data sources → Add data source**.
+2. Выбери **Prometheus**.
+3. Укажи URL до Prometheus (например `http://localhost:9090` или `http://prometheus:9090` в Docker).
+4. Сохрани (**Save & test**).
+
+### 4. Grafana: панель «Сервис жив / не жив»
+
+**Вариант A — одна панель «жив/не жив» (Stat или Gauge):**
+
+1. Создай дашборд или открой существующий → **Add panel**.
+2. В запросе выбери **Prometheus** и в поле запроса введи:
+
+   ```promql
+   up{job="telegramm-publish-gv"}
+   ```
+
+   Метрика `up` есть у Prometheus по умолчанию: **1** — скрап успешен (сервис жив), **0** — скрап не удался (сервис не отвечает или недоступен).
+
+3. В настройках панели:
+   - **Visualization**: выбери **Stat** или **Gauge**.
+   - В **Field** (или **Standard options**) задай **Unit** → **none** и при желании **Min** = 0, **Max** = 1.
+   - В **Thresholds** можно задать: зелёный при значении 1, красный при 0 (например: Base = 0 — красный, добавить threshold 1 — зелёный).
+   - **Title** панели, например: `TelegrammPublishGV — статус`.
+
+Так на дашборде будет одно число: **1** = жив, **0** = не жив.
+
+**Вариант B — текст «Жив» / «Не жив»:**
+
+1. Та же панель с запросом `up{job="telegramm-publish-gv"}`.
+2. **Visualization** → **Stat**.
+3. В **Value options** включи **Color mode** → **Background** и настрой **Thresholds**: 0 — красный, 1 — зелёный.
+4. В **Text mode** (если есть) или через **Overrides** можно вывести для значения 1 текст «Жив», для 0 — «Не жив» (в части плагинов это делается через **Mappings** или кастомные переопределения полей).
+
+**Вариант C — график по времени:**
+
+1. Запрос тот же: `up{job="telegramm-publish-gv"}`.
+2. **Visualization** → **Time series** (график).
+3. На графике будет линия 0 или 1: видно, когда сервис был жив (1) и когда падал (0).
+
+### Кратко
+
+| Что сделать | Где |
+|-------------|-----|
+| Метрики сервиса | GET http://localhost:5689/metrics |
+| Добавить цель в Prometheus | `prometheus.yml` → job `telegramm-publish-gv`, target `:5689` |
+| В Grafana увидеть «жив/не жив» | Панель с запросом `up{job="telegramm-publish-gv"}`, визуализация Stat/Gauge или Time series |
+
 ## Лицензия
 
 Проект для внутреннего использования.
