@@ -1,0 +1,6 @@
+@TelegrammPublishGV_HostAddress = http://localhost:5172
+
+GET {{TelegrammPublishGV_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

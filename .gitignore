@@ -1,0 +1,50 @@
+# Build
+bin/
+obj/
+out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# User-specific
+*.rsuser
+*.userprefs
+appsettings.*.local.json
+appsettings.Development.json
+secrets.json
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+
+# Test / coverage
+TestResults/
+coverage*.json
+*.trx
+*.coverage
+*.coveragexml
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Rider
+.idea/
+*.sln.iml
+
+# Misc
+*.swp
+*~
+.cache

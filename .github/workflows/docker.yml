@@ -1,0 +1,43 @@
+name: Build and push Docker image
+
+# Триггер — только по кнопке
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Тег версии Docker-образа (например, v1.0.0)'
+        required: true
+        default: 'latest'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    # Разрешения для пуша в GHCR
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # 1️⃣ Забираем код из выбранной ветки
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2️⃣ Логинимся в GHCR
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3️⃣ Build & push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/belkins23/telegrammpublishgv:${{ github.event.inputs.version }}
+            ghcr.io/belkins23/telegrammpublishgv:latest

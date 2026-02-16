@@ -1,0 +1,42 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Build output (will be built in container)
+bin/
+obj/
+out/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Docs / misc (not needed in image)
+*.md
+*.txt
+!appsettings*.json
+
+# Test
+**/TestResults/
+**/*Tests/
+**/*.Tests/
+
+# NuGet (restore in container)
+packages/
+*.nupkg
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# User secrets / local overrides
+appsettings.*.local.json
+secrets.json
