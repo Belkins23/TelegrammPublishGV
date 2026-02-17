@@ -48,3 +48,5 @@ logs/
 *.swp
 *~
 .cache
+yh.env.prod
+yh.env.test
