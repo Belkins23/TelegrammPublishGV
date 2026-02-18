@@ -148,6 +148,8 @@ scrape_configs:
 | Добавить цель в Prometheus | `prometheus.yml` → job `telegramm-publish-gv`, target `:5689` |
 | В Grafana увидеть «жив/не жив» | Панель с запросом `up{job="telegramm-publish-gv"}`, визуализация Stat/Gauge или Time series |
 
+В репозитории лежит готовый дашборд **grafana-dashboard-service-health.json**: в нём есть панель **TelegrammPublishGV** (Stat по `up{job="telegramm-publish-gv"}`) и таблица **TelegrammPublishGV — Backends (Redis, RabbitMQ)** по метрике `telegramm_backend_info` (хост и порт Redis и RabbitMQ без паролей). Импорт в Grafana: **Dashboard → Import → Upload JSON file**; при необходимости укажи свой Data source (uid Prometheus в JSON: `efb0pky7v6scge`).
+
 ## Лицензия
 
 Проект для внутреннего использования.

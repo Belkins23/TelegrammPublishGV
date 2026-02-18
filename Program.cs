@@ -1,3 +1,4 @@
+using Prometheus;
 using Serilog;
 using TelegrammPublishGV;
 using TelegrammPublishGV.Services;
@@ -39,6 +40,32 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Метрика для Grafana: версия приложения, Redis и RabbitMQ (без паролей)
+try
+{
+    var version = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.0.0";
+    var redis = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RedisSettings>>().Value;
+    var rabbit = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RabbitMQStatesOptions>>().Value;
+    var redisHost = "?";
+    var redisPort = "?";
+    if (!string.IsNullOrEmpty(redis.ConnectionString))
+    {
+        var firstPart = redis.ConnectionString.Split(',')[0].Trim();
+        var colon = firstPart.LastIndexOf(':');
+        if (colon > 0) { redisHost = firstPart[..colon]; redisPort = firstPart[(colon + 1)..]; }
+        else { redisHost = firstPart; }
+    }
+    var gauge = Prometheus.Metrics.CreateGauge(
+        "telegramm_backend_info",
+        "Version and backends (Redis, RabbitMQ) used by TelegrammPublishGV",
+        new Prometheus.GaugeConfiguration { LabelNames = new[] { "version", "redis_host", "redis_port", "rabbitmq_host", "rabbitmq_port" } });
+    gauge.WithLabels(version, redisHost, redisPort, rabbit.HostName ?? "?", rabbit.Port.ToString()).Set(1);
+}
+catch
+{
+    // метрика опциональна при ошибке конфигурации
+}
 
 app.UseSerilogRequestLogging();
 
