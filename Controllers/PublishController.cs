@@ -52,6 +52,7 @@ public class PublishController : ControllerBase
         }
 
         var chatId = !string.IsNullOrWhiteSpace(request.ChatId) ? request.ChatId : _telegramOptions.ChannelId;
+        var role = string.IsNullOrWhiteSpace(request.Role) ? "courier" : request.Role!.Trim().ToLowerInvariant();
 
         var url = $"https://api.telegram.org/bot{_telegramOptions.BotToken}/sendMessage";
         var body = new TelegramSendMessageRequest
@@ -92,10 +93,10 @@ public class PublishController : ControllerBase
         {
             try
             {
-                await _orderPayloadStore.SaveAsync(orderId, request, cancellationToken);
+                await _orderPayloadStore.SaveAsync(orderId, request, role, cancellationToken);
                 if (result.Result != null)
-                    await _orderPayloadStore.SaveMessageLocationAsync(orderId, chatId, result.Result.MessageId, cancellationToken);
-                _logger.LogInformation("Payload и расположение заказа {OrderId} сохранены в Redis", orderId);
+                    await _orderPayloadStore.SaveMessageLocationAsync(orderId, chatId, result.Result.MessageId, role, cancellationToken);
+                _logger.LogInformation("Payload и расположение заказа {OrderId} (роль {Role}) сохранены в Redis", orderId, role);
             }
             catch (Exception ex)
             {
@@ -103,7 +104,9 @@ public class PublishController : ControllerBase
             }
         }
 
-        if (!string.IsNullOrEmpty(orderId) && result.Result != null)
+        // Состояние заказа в order_delivery отслеживается только для курьеров.
+        // Для менеджеров (role == "manager") состояние не публикуем.
+        if (role == "courier" && !string.IsNullOrEmpty(orderId) && result.Result != null)
         {
             await _orderStatePublisher.PublishAsync(new OrderDeliveryStateMessage
             {
@@ -126,7 +129,7 @@ public class PublishController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status502BadGateway)]
-    public async Task<IActionResult> DeleteByOrderId(string orderId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> DeleteByOrderId(string orderId, [FromQuery] string? role = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(orderId))
             return BadRequest("orderId не указан.");
@@ -137,7 +140,9 @@ public class PublishController : ControllerBase
             return BadRequest("Telegram BotToken не задан в appsettings.");
         }
 
-        var location = await _orderPayloadStore.GetMessageLocationAsync(orderId, cancellationToken);
+        var effectiveRole = string.IsNullOrWhiteSpace(role) ? "courier" : role.Trim().ToLowerInvariant();
+
+        var location = await _orderPayloadStore.GetMessageLocationAsync(orderId, effectiveRole, cancellationToken);
         if (location == null)
         {
             _logger.LogInformation("Публикация заказа {OrderId} не найдена в Redis", orderId);
@@ -160,21 +165,25 @@ public class PublishController : ControllerBase
 
         try
         {
-            await _orderPayloadStore.DeleteAsync(orderId, cancellationToken);
+            await _orderPayloadStore.DeleteAsync(orderId, effectiveRole, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Не удалось удалить данные заказа {OrderId} из Redis", orderId);
         }
 
-        await _orderStatePublisher.PublishAsync(new OrderDeliveryStateMessage
+        // Состояние Deleted отслеживается только для курьеров (order_delivery — только для курьеров).
+        if (effectiveRole == "courier")
         {
-            OrderId = orderId,
-            Status = OrderDeliveryStatus.Deleted,
-            Timestamp = DateTime.UtcNow
-        }, cancellationToken);
+            await _orderStatePublisher.PublishAsync(new OrderDeliveryStateMessage
+            {
+                OrderId = orderId,
+                Status = OrderDeliveryStatus.Deleted,
+                Timestamp = DateTime.UtcNow
+            }, cancellationToken);
+        }
 
-        _logger.LogInformation("Публикация заказа {OrderId} удалена из канала", orderId);
+        _logger.LogInformation("Публикация заказа {OrderId} (роль {Role}) удалена из канала", orderId, effectiveRole);
         return NoContent();
     }
 }

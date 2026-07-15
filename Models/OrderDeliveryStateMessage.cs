@@ -37,4 +37,5 @@ public static class OrderDeliveryStatus
     public const string Delivered = "Delivered";
     public const string Refused = "Refused";
     public const string Deleted = "Deleted";
+    public const string ManagerAccepted = "ManagerAccepted";
 }

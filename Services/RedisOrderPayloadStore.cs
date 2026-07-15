@@ -14,36 +14,41 @@ public class RedisOrderPayloadStore : IOrderPayloadStore
         _redis = redis;
     }
 
-    public async Task SaveAsync(string orderId, PublishRequest payload, CancellationToken cancellationToken = default)
+    // Ключи включают роль, чтобы сообщения менеджера и курьера для одного заказа
+    // могли сосуществовать и удаляться независимо.
+    private static string PayloadKey(string orderId, string role) => KeyPrefix + orderId + ":" + role;
+    private static string MessageKey(string orderId, string role) => KeyPrefix + orderId + ":" + role + ":message";
+
+    public async Task SaveAsync(string orderId, PublishRequest payload, string role = "courier", CancellationToken cancellationToken = default)
     {
         var db = _redis.GetDatabase();
-        var key = KeyPrefix + orderId;
+        var key = PayloadKey(orderId, role);
         var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
         await db.StringSetAsync(key, json, DefaultTtl);
     }
 
-    public async Task<PublishRequest?> GetAsync(string orderId, CancellationToken cancellationToken = default)
+    public async Task<PublishRequest?> GetAsync(string orderId, string role = "courier", CancellationToken cancellationToken = default)
     {
         var db = _redis.GetDatabase();
-        var key = KeyPrefix + orderId;
+        var key = PayloadKey(orderId, role);
         var json = await db.StringGetAsync(key);
         if (json.IsNullOrEmpty)
             return null;
         return Newtonsoft.Json.JsonConvert.DeserializeObject<PublishRequest>(json!);
     }
 
-    public async Task SaveMessageLocationAsync(string orderId, string chatId, int messageId, CancellationToken cancellationToken = default)
+    public async Task SaveMessageLocationAsync(string orderId, string chatId, int messageId, string role = "courier", CancellationToken cancellationToken = default)
     {
         var db = _redis.GetDatabase();
-        var key = KeyPrefix + orderId + ":message";
+        var key = MessageKey(orderId, role);
         var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { ChatId = chatId, MessageId = messageId });
         await db.StringSetAsync(key, json, DefaultTtl);
     }
 
-    public async Task<OrderMessageLocation?> GetMessageLocationAsync(string orderId, CancellationToken cancellationToken = default)
+    public async Task<OrderMessageLocation?> GetMessageLocationAsync(string orderId, string role = "courier", CancellationToken cancellationToken = default)
     {
         var db = _redis.GetDatabase();
-        var key = KeyPrefix + orderId + ":message";
+        var key = MessageKey(orderId, role);
         var json = await db.StringGetAsync(key);
         if (json.IsNullOrEmpty)
             return null;
@@ -51,11 +56,11 @@ public class RedisOrderPayloadStore : IOrderPayloadStore
         return obj != null ? new OrderMessageLocation(obj.ChatId ?? "", obj.MessageId) : null;
     }
 
-    public async Task DeleteAsync(string orderId, CancellationToken cancellationToken = default)
+    public async Task DeleteAsync(string orderId, string role = "courier", CancellationToken cancellationToken = default)
     {
         var db = _redis.GetDatabase();
-        await db.KeyDeleteAsync(KeyPrefix + orderId);
-        await db.KeyDeleteAsync(KeyPrefix + orderId + ":message");
+        await db.KeyDeleteAsync(PayloadKey(orderId, role));
+        await db.KeyDeleteAsync(MessageKey(orderId, role));
     }
 
     private class OrderMessageLocationDto

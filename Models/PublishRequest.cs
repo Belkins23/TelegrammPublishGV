@@ -35,6 +35,10 @@ public class PublishRequest
     /// <summary>Клавиатура (кнопки под сообщением).</summary>
     [JsonProperty("reply_markup", NullValueHandling = NullValueHandling.Ignore)]
     public ReplyMarkup? ReplyMarkup { get; set; }
+
+    /// <summary>Роль получателя публикации: "courier" (по умолчанию, если null/пусто) или "manager".</summary>
+    [JsonProperty("role")]
+    public string? Role { get; set; }
 }
 
 public class ReplyMarkup

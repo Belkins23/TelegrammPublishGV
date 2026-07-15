@@ -48,6 +48,14 @@ public class TelegramCallbackProcessor
         var isTakeOrder = data.StartsWith("take_", StringComparison.OrdinalIgnoreCase);
         var isDelivered = data.StartsWith("delivered_", StringComparison.OrdinalIgnoreCase);
         var isRefuse = data.StartsWith("refuse_", StringComparison.OrdinalIgnoreCase);
+        var isAccept = data.StartsWith("accept_", StringComparison.OrdinalIgnoreCase);
+
+        if (isAccept && msg != null && msg.Chat != null && from != null)
+        {
+            var acceptOrderId = data.Length > 7 ? data[7..] : "?";
+            await HandleAcceptAsync(baseUrl, callback, msg, from.Id, userName, acceptOrderId, ct);
+            return;
+        }
 
         if (isDelivered && msg != null && msg.Chat != null && from != null)
         {
@@ -132,6 +140,32 @@ public class TelegramCallbackProcessor
         }
     }
 
+    /// <summary>Менеджер принял заказ (accept_&lt;id&gt;): помечаем сообщение «Принял», убираем клавиатуру, публикуем ManagerAccepted.</summary>
+    private async Task HandleAcceptAsync(string baseUrl, TelegramCallbackQuery callback, TelegramMessage msg, long fromUserId, string userName, string orderId, CancellationToken ct)
+    {
+        await AnswerCallbackQueryAsync(baseUrl, callback.Id, "Принято", showAlert: false, ct);
+        try
+        {
+            using var client = _httpClientFactory.CreateClient();
+            var editUrl = $"{baseUrl}/editMessageText";
+            var newText = (string.IsNullOrEmpty(msg.Text) ? "" : msg.Text) + "\n✅ Принял: " + userName;
+            var editBody = new { chat_id = msg.Chat!.Id, message_id = msg.MessageId, text = newText, reply_markup = new { inline_keyboard = Array.Empty<object>() } };
+            var editJson = Newtonsoft.Json.JsonConvert.SerializeObject(editBody);
+            using var editContent = new StringContent(editJson, System.Text.Encoding.UTF8, "application/json");
+            await client.PostAsync(editUrl, editContent, ct);
+            _logger.LogInformation("Заказ принят менеджером: orderId={OrderId}, пользователь={User}", orderId, userName);
+            await _orderStatePublisher.PublishAsync(new OrderDeliveryStateMessage
+            {
+                OrderId = orderId,
+                Status = OrderDeliveryStatus.ManagerAccepted,
+                Timestamp = DateTime.UtcNow,
+                UserId = fromUserId,
+                UserName = userName
+            }, ct);
+        }
+        catch (Exception ex) { _logger.LogError(ex, "Ошибка при принятии заказа менеджером"); }
+    }
+
     private async Task HandleDeliveredAsync(string baseUrl, TelegramCallbackQuery callback, TelegramMessage msg, long fromUserId, string userName, string orderId, CancellationToken ct)
     {
         var key = (msg.Chat!.Id, msg.MessageId);
@@ -193,7 +227,7 @@ public class TelegramCallbackProcessor
                 var deleteOrderJson = Newtonsoft.Json.JsonConvert.SerializeObject(deleteOrderBody);
                 using var deleteOrderContent = new StringContent(deleteOrderJson, System.Text.Encoding.UTF8, "application/json");
                 await client.PostAsync(deleteUrl, deleteOrderContent, ct);
-                var payload = await _orderPayloadStore.GetAsync(orderId, ct);
+                var payload = await _orderPayloadStore.GetAsync(orderId, "courier", ct);
                 var republished = false;
                 if (payload != null && !string.IsNullOrEmpty(payload.Text))
                 {
