@@ -12,4 +12,7 @@ public class TelegramOptions
 
     /// <summary>Базовый URL приложения (https://твой-домен.ru) — для регистрации webhook в Telegram.</summary>
     public string WebhookBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>Секрет заголовка X-Telegram-Bot-Api-Secret-Token для webhook.</summary>
+    public string WebhookSecret { get; set; } = string.Empty;
 }

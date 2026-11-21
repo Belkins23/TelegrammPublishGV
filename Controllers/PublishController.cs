@@ -39,6 +39,12 @@ public class PublishController : ControllerBase
     [ProducesResponseType(StatusCodes.Status502BadGateway)]
     public async Task<IActionResult> Publish([FromBody] PublishRequest request, CancellationToken cancellationToken = default)
     {
+        if (!InternalRequestGuard.IsAllowed(HttpContext))
+        {
+            _logger.LogWarning("Отклонён внешний запрос на публикацию от {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
+            return NotFound();
+        }
+
         if (string.IsNullOrWhiteSpace(_telegramOptions.BotToken) || string.IsNullOrWhiteSpace(_telegramOptions.ChannelId))
         {
             _logger.LogWarning("Telegram BotToken или ChannelId не заданы в appsettings");
@@ -131,6 +137,9 @@ public class PublishController : ControllerBase
     [ProducesResponseType(StatusCodes.Status502BadGateway)]
     public async Task<IActionResult> DeleteByOrderId(string orderId, [FromQuery] string? role = null, CancellationToken cancellationToken = default)
     {
+        if (!InternalRequestGuard.IsAllowed(HttpContext))
+            return NotFound();
+
         if (string.IsNullOrWhiteSpace(orderId))
             return BadRequest("orderId не указан.");
 

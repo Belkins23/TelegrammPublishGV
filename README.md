@@ -39,7 +39,7 @@ Web API для публикации заказов в Telegram-канал с и�
 
 ## API
 
-- **POST /api/publish** — публикация сообщения в канал. Тело — JSON в формате Telegram sendMessage: `chat_id` (необязательно), `text`, `parse_mode` (например `"HTML"`), `reply_markup` с `inline_keyboard`.
+- **POST /api/publish** — внутренний endpoint публикации. Принимает запросы только с localhost, private Docker и WireGuard адресов. Тело — JSON в формате Telegram sendMessage: `chat_id` (необязательно), `text`, `parse_mode` (например `"HTML"`), `reply_markup` с `inline_keyboard`.
 - **DELETE /api/publish/order/{orderId}** — удаление публикации заказа из канала по id заказа.
 - **POST /api/telegram/webhook** — приём обновлений от Telegram (используется при `UseWebhook: true`).
 
@@ -57,7 +57,7 @@ dotnet run
 ## Режимы получения обновлений от Telegram
 
 - **getUpdates (по умолчанию)** — `UseWebhook: false` или не задан. Фоновый сервис опрашивает Telegram; не нужен публичный URL.
-- **Webhook** — `UseWebhook: true` и `WebhookBaseUrl: "https://ваш-домен"`. При старте регистрируется URL `https://ваш-домен/api/telegram/webhook`. Нужен HTTPS и доступный из интернета адрес.
+- **Webhook** — `UseWebhook: true`, `WebhookBaseUrl: "https://ваш-домен"` и обязательный `WebhookSecret`. При старте регистрируется URL `https://ваш-домен/api/telegram/webhook` с Telegram secret token. В режиме long polling endpoint webhook возвращает 404.
 
 ## RabbitMQ: форматы сообщений в очереди
 

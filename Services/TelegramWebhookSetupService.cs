@@ -30,11 +30,17 @@ public class TelegramWebhookSetupService : IHostedService
 
         if (_options.UseWebhook && !string.IsNullOrWhiteSpace(_options.WebhookBaseUrl))
         {
+            if (string.IsNullOrWhiteSpace(_options.WebhookSecret))
+            {
+                _logger.LogError("Webhook включён без Telegram:WebhookSecret; регистрация отменена");
+                return;
+            }
+
             var webhookUrl = _options.WebhookBaseUrl.TrimEnd('/') + "/api/telegram/webhook";
             try
             {
                 using var client = _httpClientFactory.CreateClient();
-                var url = $"{baseUrl}/setWebhook?url={Uri.EscapeDataString(webhookUrl)}";
+                var url = $"{baseUrl}/setWebhook?url={Uri.EscapeDataString(webhookUrl)}&secret_token={Uri.EscapeDataString(_options.WebhookSecret)}";
                 using var response = await client.GetAsync(url, cancellationToken);
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (response.IsSuccessStatusCode)
